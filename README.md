@@ -94,15 +94,7 @@ The scenario also runs as an end-to-end test (`tests/e2e`, through the program a
 
 ## Verification status
 
-Verified on 2026-10-27: `make up`, `make db`, `make test-integration`, `make test-e2e` and `make lint` against the compose database, and the no-database steps of a fresh clone (`make install`, `make check`, `make audit`: 142 tests pass, 2 import contracts kept, 99% coverage of domain and application, no known vulnerabilities).
-
-Pending capacity (the shared Docker host ran out of memory while this was built):
-
-- `make run` after the last change to the first-pass numbers: the unit and integration tests cover the same path, but the printed demo was not re-run.
-- `make docker-build`.
-- The Docker-based steps of a fresh clone (`make up`, `make run`).
-
-Run `make up && make run && make docker-build` once the machine is quiet.
+Verified on 2026-10-27 in a fresh clone, one stack at a time: `make install`, `make check` and `make audit` (142 unit tests, 2 import contracts kept, 99% coverage of domain and application, no known vulnerabilities), `make up`, `make run` (the planted day, six breaks, resolution twice, the report, the next day; the last line is `ledger sum across every posting: 0.00`), `make queries`, `make test-integration` (33 passed), `make test-e2e` (2 passed), `make down`, and `make docker-build`.
 
 ## Stretch goals
 
