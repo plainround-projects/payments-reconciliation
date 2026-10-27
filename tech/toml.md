@@ -12,7 +12,7 @@ TOML (Tom's Obvious, Minimal Language) is a plain-text **configuration file form
 
 | Path | Role |
 | --- | --- |
-| `pyproject.toml` | Project metadata and every tool's settings (98 lines). |
+| `pyproject.toml` | Project metadata and every tool's settings (100 lines). |
 
 ## How it works underneath
 
