@@ -91,6 +91,18 @@ The provider's files are CSV: [data/settlement_2026-10-19.csv](data/settlement_2
 
 The scenario also runs as an end-to-end test (`tests/e2e`, through the program and a real server process, which serves the same report at `GET /v1/days/2026-10-20/report`).
 
+## Verification status
+
+Verified on 2026-10-27: `make up`, `make db`, `make test-integration`, `make test-e2e` and `make lint` against the compose database, and the no-database steps of a fresh clone (`make install`, `make check`, `make audit`: 142 tests pass, 2 import contracts kept, 99% coverage of domain and application, no known vulnerabilities).
+
+Pending capacity (the shared Docker host ran out of memory while this was built):
+
+- `make run` after the last change to the first-pass numbers: the unit and integration tests cover the same path, but the printed demo was not re-run.
+- `make docker-build`.
+- The Docker-based steps of a fresh clone (`make up`, `make run`).
+
+Run `make up && make run && make docker-build` once the machine is quiet.
+
 ## Stretch goals
 
 | Stretch (from the lesson) | Built? |
