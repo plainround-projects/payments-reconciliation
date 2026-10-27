@@ -8,6 +8,7 @@ A daily reconciliation job for a small payments service: it compares the ledger 
 | **Planned hours** | 10 |
 | **Level** | Intermediate |
 | **Architecture** | [ARCHITECTURE.md](ARCHITECTURE.md), decisions: [docs/adr](docs/adr) |
+| **Technology notes** | [tech/](tech/README.md): one beginner note per technology used here |
 
 ## Prerequisites
 
@@ -146,6 +147,7 @@ tests/
   integration/       the schema's rules, the migrations against the schema, the resolvers and their race, on PostgreSQL.
   e2e/               the lesson's scenario through the program and a real server process, graceful shutdown.
 docs/adr/            decision records: the stable join and the causes, resolving from the report, planting by cause, timing.
+tech/                one beginner-level note per technology used here (tech/README.md is the index).
 docker-compose.yml   PostgreSQL 18 (and the API under the "app" profile).      Dockerfile  the API as an image.
 pyproject.toml       project metadata and every tool's configuration (ruff, mypy, pytest, import-linter).
 requirements*.lock   hash-pinned dependencies (runtime, and runtime plus development tools); `make lock` regenerates them.
