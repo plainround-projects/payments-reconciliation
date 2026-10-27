@@ -1,0 +1,7 @@
+provider_txn_id,amount,fee,status,settled_at
+ptx_s0001,42.50,1.23,settled,2026-10-19T23:30:01Z
+ptx_s0002,18.00,0.60,settled,2026-10-19T23:30:02Z
+ptx_s0003,99.99,2.90,settled,2026-10-19T23:30:03Z
+ptx_s0004,10.00,0.29,settled,2026-10-19T23:30:04Z
+ptx_s0005,25.00,0.73,settled,2026-10-19T23:30:05Z
+ptx_s0006,5.00,0.15,settled,2026-10-19T23:30:06Z
