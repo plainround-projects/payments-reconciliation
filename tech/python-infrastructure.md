@@ -674,7 +674,7 @@ A clock the simulation sets to each payment's time. `set` moves it, `now` reads 
 ```python
 @dataclass(frozen=True, slots=True)
 class Plants:
-    """Where, by position in the day's capture order, each break is planted (the lesson's ids ptx_0050 and so on)."""
+    """Where, by position in the day's capture order, each break is planted (the lesson's ids, ptx_0050 to ptx_0400)."""
 
     timing: int = 50
     fee: int = 112
