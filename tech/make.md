@@ -140,6 +140,226 @@ The second line makes `make test` fail if domain and application coverage drops 
 
 `check: lint test` has no recipe; it only lists prerequisites, so it runs both. CI calls it.
 
+<!-- listing:Makefile -->
+### `Makefile` (110 lines)
+
+```make
+# make up | db | run | reconcile-sample | queries | serve | test | test-integration | test-e2e | lint | audit | down   (make help lists all)
+PYTHON ?= $(shell command -v python3.13 || command -v python3.12 || command -v python3)
+VENV := .venv
+PY := $(VENV)/bin/python
+STAMP := $(VENV)/.installed
+POSTGRES_USER ?= reconciliation
+POSTGRES_DB ?= reconciliation
+PSQL := docker compose exec -T postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -v ON_ERROR_STOP=1 -q
+CLI := $(VENV)/bin/payments-reconciliation
+```
+
+The first line is a comment listing the targets (`make up`, `make db`, ...). `PYTHON ?= $(shell command -v python3.13 || command -v python3.12 || command -v python3)`: `?=` assigns only if the variable has no value yet, so you can override it on the command line; `$(shell ...)` runs a shell command and uses its output; `command -v name` prints where a program is; `||` tries the next alternative when the previous one printed nothing. So the newest of the three Pythons found is used. `VENV := .venv` names the virtual-environment folder (`:=` evaluates immediately); `PY` is the interpreter inside it; `STAMP` is a marker file `.venv/.installed`; `POSTGRES_USER` and `POSTGRES_DB` default to `reconciliation`. `PSQL` is the command that runs `psql` inside the database container (`-T` means no terminal, `-v ON_ERROR_STOP=1` stops at the first SQL error, `-q` is quiet). `CLI` is the command-line program installed into the virtual environment, `payments-reconciliation`.
+
+```make
+-include .env
+export
+```
+
+`-include .env` reads the file `.env` (variables of the form `NAME=value`) into make, and the leading dash means "no error if it does not exist". A bare `export` then passes every make variable to the programs make starts, so the Python programs and Docker Compose see the password and ports.
+
+```make
+.PHONY: help install lock env up db reset-db migrate queries run reconcile-sample serve health lint format test \
+        test-integration test-e2e audit check docker-build down clean
+```
+
+`.PHONY:` lists names that are commands and not files, so a file called `test` can never stop `make test` from running. The backslash continues the line.
+
+```make
+help: ## list the targets
+	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | sort
+```
+
+`help` prints the targets. Every target with a `## description` comment is found by `grep -hE '^[a-z-]+:.*## '` over the makefiles (`-h` hides file names, `-E` enables extended patterns), `sed` rewrites `target: ... ## text` into `target<TAB>text`, and `sort` orders them. The leading `@` stops make from printing the command itself.
+
+```make
+$(STAMP): requirements-dev.lock pyproject.toml
+	$(PYTHON) -m venv $(VENV)
+	$(VENV)/bin/pip install -q --require-hashes -r requirements-dev.lock
+	$(VENV)/bin/pip install -q --no-deps -e .
+	touch $@
+
+install: $(STAMP) ## create .venv from the lock file
+```
+
+The environment target. `$(STAMP): requirements-dev.lock pyproject.toml` says the file `.venv/.installed` depends on those two files; make runs the recipe again only when either is newer. The recipe lines (each starts with a tab): create the virtual environment (`-m venv`), install exactly the locked packages (`pip install -q --require-hashes -r requirements-dev.lock`: `-q` quiet, `--require-hashes` accepts only files whose hash is in the lock), install this project itself in editable mode without resolving dependencies (`--no-deps -e .`), and `touch $@` creates the stamp (`$@` means the target name). `install` just depends on the stamp.
+
+```make
+lock: ## regenerate the hash-pinned lock files from pyproject.toml (needs uv)
+	uv pip compile pyproject.toml --generate-hashes --python-version 3.12 -o requirements.lock
+	uv pip compile pyproject.toml --extra dev --generate-hashes --python-version 3.12 -o requirements-dev.lock
+```
+
+`lock` regenerates the two lock files from `pyproject.toml` with `uv pip compile ... --generate-hashes --python-version 3.12 -o ...`. The second line adds `--extra dev` for the development tools. It needs the tool `uv`.
+
+```make
+env:
+	@[ -f .env ] || { cp .env.example .env; echo "created .env from .env.example"; }
+```
+
+`env` creates `.env` from `.env.example` only if it does not exist: `[ -f .env ] || { cp .env.example .env; echo "..."; }` (`[ -f file ]` tests that the file exists; `||` runs the next part only when the test failed).
+
+```make
+up: env $(STAMP) ## start PostgreSQL and load sql/001_schema.sql and sql/002_seed.sql
+	docker compose up -d --wait postgres
+	$(MAKE) --no-print-directory db
+```
+
+`up` starts the database: it needs `.env` and the environment, then `docker compose up -d --wait postgres` starts the `postgres` service in the background (`-d`) and waits until its health check passes (`--wait`), then `$(MAKE) --no-print-directory db` runs the `db` target.
+
+```make
+reset-db:
+	$(PSQL) < sql/reset.sql
+
+db: reset-db ## recreate the schema from sql/001_schema.sql and load sql/002_seed.sql (drops existing data)
+	$(PSQL) < sql/001_schema.sql
+	$(PSQL) < sql/002_seed.sql
+
+# The lesson's stepwise path: apply sql/migrations/*.sql, in order, to a scratch database (reconciliation_migrated).
+```
+
+`reset-db` runs `sql/reset.sql` through `psql` (the `< file` feeds the file to its standard input). `db` depends on it, then loads the schema and the seed the same way.
+
+```make
+migrate: ## apply sql/migrations/*.sql to a scratch database and list its tables
+	-docker compose exec -T postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -q -c "DROP DATABASE IF EXISTS reconciliation_migrated"
+	docker compose exec -T postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -q -c "CREATE DATABASE reconciliation_migrated"
+	@for file in sql/migrations/*.sql; do echo "applying $$file"; \
+	  docker compose exec -T postgres psql -U $(POSTGRES_USER) -d reconciliation_migrated -v ON_ERROR_STOP=1 -q < $$file; done
+	docker compose exec -T postgres psql -U $(POSTGRES_USER) -d reconciliation_migrated -c "\dt"
+```
+
+`migrate` applies the stepwise migrations to a scratch database: the first line drops `reconciliation_migrated` if it exists (the leading `-` ignores a failure), the second creates it, the loop `for file in sql/migrations/*.sql; do ...; done` applies each file in sorted order (`$$file` is how a shell variable is written inside a makefile), and the last line lists the tables.
+
+```make
+queries: ## run sql/003_queries.sql
+	docker compose exec -T postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) -v ON_ERROR_STOP=1 < sql/003_queries.sql
+
+# The lesson's whole scenario: a clean day, the planted day (500 payments, six breaks), resolution twice, the report,
+# the next day. Resets the database and the settlement folder first.
+```
+
+`queries` runs `sql/003_queries.sql`.
+
+```make
+run: $(STAMP) db ## the lesson's scenario end to end, including the planted breaks (resets the database)
+	rm -rf var/settlement
+	$(CLI) demo
+	$(MAKE) --no-print-directory queries
+
+# Reconciles the seeded day (sql/002_seed.sql) against data/settlement_2026-10-19.csv: one fee difference.
+```
+
+`run` is the lesson's scenario. It depends on the stamp and on `db` (so the database is rebuilt first). Its recipe: `rm -rf var/settlement` removes the folder of settlement files from earlier runs, `$(CLI) demo` runs the seven-step demo, and `$(MAKE) --no-print-directory queries` runs the SQL queries afterwards. The comment above explains the scenario: a clean day, the planted day (500 payments, six breaks), resolution twice, the report and the next day.
+
+```make
+reconcile-sample: $(STAMP) ## reconcile the seeded sample day against its sample settlement file
+	mkdir -p var/settlement && cp data/settlement_2026-10-19.csv var/settlement/
+	$(CLI) reconcile --date 2026-10-19
+	$(CLI) resolve --date 2026-10-19
+	$(CLI) report --date 2026-10-19
+```
+
+`reconcile-sample` reconciles the seeded sample day against the sample provider file `data/settlement_2026-10-19.csv`, which differs only in one fee. `mkdir -p var/settlement` creates the folder if needed (`-p` makes parents and does not fail if it exists), `cp` copies the sample file into it, then the program reconciles the day, resolves its breaks and prints the report. The comment above it says what to expect: one fee difference.
+
+```make
+serve: $(STAMP) ## run the HTTP API in the foreground (Ctrl-C or SIGTERM stops it gracefully)
+	$(VENV)/bin/payments-reconciliation-serve
+```
+
+`serve` runs the HTTP API in the foreground, using the command installed into the virtual environment. `health` runs the health command.
+
+```make
+health: $(STAMP) ## exit 0 when the running API reports healthy
+	$(VENV)/bin/payments-reconciliation-health
+```
+
+`health` asks the running API whether it is healthy.
+
+```make
+lint: $(STAMP) ## ruff check, ruff format check, mypy, import-linter
+	$(VENV)/bin/ruff check .
+	$(VENV)/bin/ruff format --check .
+	$(VENV)/bin/mypy
+	$(VENV)/bin/lint-imports
+```
+
+`lint` runs, in order: `ruff check .` (style and likely bugs), `ruff format --check .` (is the layout canonical), `mypy` (types) and `lint-imports` (the layering rules). The first failure stops make.
+
+```make
+format: $(STAMP) ## apply ruff's formatting and safe fixes
+	$(VENV)/bin/ruff check --fix .
+	$(VENV)/bin/ruff format .
+
+# Unit tests need no services. The domain and application must stay at 95% coverage or more.
+```
+
+`format` applies Ruff's safe fixes and formatting.
+
+```make
+test: $(STAMP) ## unit tests with coverage (no database needed)
+	$(PY) -m pytest tests/unit --cov=payments_reconciliation --cov-report=term
+	$(PY) -m coverage report --include='src/payments_reconciliation/domain/*,src/payments_reconciliation/application/*' --fail-under=95
+```
+
+`test` runs the unit tests with coverage (`--cov=payments_reconciliation --cov-report=term`) and then fails if the coverage of the domain and application packages is under 95 percent (`coverage report ... --fail-under=95`).
+
+```make
+test-integration: $(STAMP) ## adapters and the lesson's scenario against the running database (make up first)
+	$(PY) -m pytest tests/integration -m integration
+```
+
+`test-integration` runs the tests marked `integration` against the running database; `test-e2e` runs the tests marked `e2e`, which start a real server process.
+
+```make
+test-e2e: $(STAMP) ## the program and a real server process against the running database (make up first)
+	$(PY) -m pytest tests/e2e -m e2e
+```
+
+The end-to-end tests.
+
+```make
+audit: $(STAMP) ## check the locked dependencies for known vulnerabilities
+	$(VENV)/bin/pip-audit --no-deps --disable-pip -r requirements-dev.lock
+```
+
+`audit` checks the locked packages for known vulnerabilities (`pip-audit --no-deps --disable-pip -r requirements-dev.lock`).
+
+```make
+check: lint test ## everything that needs no services
+```
+
+`check` has no recipe of its own: it depends on `lint` and `test`, so it runs both. CI calls it.
+
+```make
+docker-build: ## build the container image of the API
+	docker build -t payments-reconciliation:dev .
+```
+
+`docker-build` builds the API image with `docker build -t payments-reconciliation:dev .`.
+
+```make
+down: ## stop PostgreSQL and delete its data
+	docker compose --profile app down -v
+```
+
+`down` stops the containers and deletes their data (`docker compose --profile app down -v`).
+
+```make
+clean: down
+	rm -rf $(VENV) logs var .pytest_cache .mypy_cache .ruff_cache .coverage
+```
+
+`clean` depends on `down` and then deletes the virtual environment, logs, caches and coverage data with `rm -rf`.
+
+<!-- /listing:Makefile -->
+
 ## Try it yourself
 
 1. List the commands:

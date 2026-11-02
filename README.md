@@ -94,7 +94,7 @@ The scenario also runs as an end-to-end test (`tests/e2e`, through the program a
 
 ## Verification status
 
-Verified on 2026-10-27 in a fresh clone, one stack at a time: `make install`, `make check` and `make audit` (142 unit tests, 2 import contracts kept, 99% coverage of domain and application, no known vulnerabilities), `make up`, `make run` (the planted day, six breaks, resolution twice, the report, the next day; the last line is `ledger sum across every posting: 0.00`), `make queries`, `make test-integration` (33 passed), `make test-e2e` (2 passed), `make down`, and `make docker-build`.
+Verified on 2026-10-27 in a fresh clone, one stack at a time: `make install`, `make check` and `make audit` (142 unit tests, 2 import contracts kept, 99% coverage of domain and application, no known vulnerabilities), `make up`, `make run` (the planted day, six breaks, resolution twice, the report, the next day; the last line is `ledger sum across every posting: 0.00`), `make queries`, `make test-integration` (33 passed), `make test-e2e` (2 passed), `make down`, and `make docker-build`. Re-run on 2026-11-02 after the technology notes were rewritten, one stack at a time: `make check` (142 unit tests, lint, types and import contracts clean), then with the database up `make test-integration` (33 passed), `make test-e2e` (2 passed), `make reconcile-sample` (one `fee_discrepancy`, `ptx_s0002`), `make migrate`, `make queries`, `make run` (ending `ledger sum across every posting: 0.00`) and `make down`.
 
 ## Stretch goals
 

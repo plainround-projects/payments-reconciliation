@@ -75,6 +75,24 @@ Run the commands from the repository root. Commands marked as needing the databa
 | [editorconfig.md](editorconfig.md) | Editor settings (tabs for `Makefile`, spaces elsewhere). |
 | [markdown.md](markdown.md) | The format of the README, architecture notes and decision records. |
 
+### 7. Line-by-line walkthroughs of every file
+
+These notes quote every source, SQL, test and configuration line of the repository and explain it in plain words. Read the general note first (for example `python.md`), then the walkthrough.
+
+| Note | What it quotes |
+| --- | --- |
+| [python-domain.md](python-domain.md) | Every file of the `domain` package: money, ledger, payments, settlement rows and CSV, matching and classification. |
+| [python-application.md](python-application.md) | The use cases (record a capture, reconcile a day, resolve breaks, daily report, worklist, health), the views and the ports. |
+| [python-infrastructure.md](python-infrastructure.md) | Settings, logging, retry, settlement files, the stub provider, the day simulator and the PostgreSQL adapters. |
+| [python-interfaces.md](python-interfaces.md) | The composition root, the HTTP app, the server launcher, the health command and the command-line program with the demo. |
+| [sql-schema.md](sql-schema.md) | `sql/reset.sql` and `sql/001_schema.sql`. |
+| [sql-seed-and-queries.md](sql-seed-and-queries.md) | `sql/002_seed.sql` and `sql/003_queries.sql`. |
+| [sql-migrations.md](sql-migrations.md) | Every file in `sql/migrations/`. |
+| [pytest-unit-tests.md](pytest-unit-tests.md) | The fixtures, fakes and every unit test. |
+| [pytest-integration-and-e2e-tests.md](pytest-integration-and-e2e-tests.md) | The fixtures and every integration and end-to-end test. |
+
+The listings of `Makefile`, `Dockerfile`, `docker-compose.yml`, `.github/workflows/ci.yml` and `pyproject.toml` sit inside [make.md](make.md), [dockerfile.md](dockerfile.md), [docker-compose.md](docker-compose.md), [github-actions.md](github-actions.md) and [toml.md](toml.md).
+
 ## A note on versions
 
 The notes describe the versions this repository pins: Python 3.12 or newer (the image uses 3.12.8; development here used 3.13), PostgreSQL 18, FastAPI 0.162, Starlette 1.10, Pydantic 2.14, psycopg 3.3, psycopg_pool 3.3, httpx 0.28, uvicorn 0.54, pytest 9.1, mypy 2.4, Ruff 0.17, import-linter 2.15, pip-audit 2.10. The exact versions are in `requirements.lock` and `requirements-dev.lock`.

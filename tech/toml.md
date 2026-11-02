@@ -62,6 +62,154 @@ dependencies = [
 
 `packages.find where = ["src"]` plus code under `src/payments_reconciliation/` means the package is only importable after installation (`pip install -e .`). Tests therefore exercise the installed package, as users would.
 
+<!-- listing:pyproject.toml -->
+### `pyproject.toml` (100 lines)
+
+```toml
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "payments-reconciliation"
+version = "0.1.0"
+description = "A daily reconciliation of a payments ledger against a provider settlement report: match on the stable id, classify every break by cause, resolve safely, report."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Sumit Srivastava" }]
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.32,<1",
+    "psycopg[binary,pool]>=3.2,<4",
+    "httpx>=0.27,<1",
+]
+```
+
+`[build-system]` tells pip how to build the project: it needs `setuptools>=75` and uses `setuptools.build_meta`.
+
+`[project]` is the project's identity: `name`, `version`, a `description`, the `readme` file, `requires-python = ">=3.12"`, a `license` and `authors`. `dependencies` lists the runtime packages as version ranges: `fastapi>=0.115,<1` means "0.115 or newer, below 1.0"; `psycopg[binary,pool]` asks for two extras of the package (a prebuilt binary and the connection pool).
+
+```toml
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<10",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "import-linter>=2.0",
+    "pip-audit>=2.7",
+]
+```
+
+`dev` is an optional group of development tools: pytest, pytest-cov, ruff, mypy, import-linter and pip-audit. (This project has no property tests, so `hypothesis` is not listed.)
+
+```toml
+[project.scripts]
+payments-reconciliation = "payments_reconciliation.interfaces.cli:main"
+payments-reconciliation-serve = "payments_reconciliation.interfaces.serve:main"
+payments-reconciliation-health = "payments_reconciliation.interfaces.health_cli:main"
+```
+
+`[project.scripts]` defines three commands that installing the project creates: `payments-reconciliation` (the command-line program), `payments-reconciliation-serve` and `payments-reconciliation-health`. Each line is `command = "package.module:function"`: run that function.
+
+```toml
+[tool.setuptools.packages.find]
+where = ["src"]
+```
+
+`where = ["src"]` tells setuptools the packages are under `src/`.
+
+```toml
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+# tech/ holds teaching notes whose code fences are excerpts; ruff would reformat Python fences in Markdown files.
+extend-exclude = ["tech"]
+```
+
+Ruff's settings: lines are at most 120 characters, the code targets Python 3.12 and the first-party packages are in `src` and `tests`. `extend-exclude = ["tech"]` keeps Ruff off the teaching notes.
+
+```toml
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "N", "C4", "RUF", "PT", "D100", "D101", "D103", "D104"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "PT018"]  # PT018: a compound assert states one fact in these tests
+```
+
+`select` chooses rule families by code prefix: `E` and `F` (style errors and Pyflakes mistakes), `I` (import order), `B` (likely bugs), `UP` (outdated syntax), `SIM` (simplifications), `N` (naming), `C4` (comprehensions), `RUF` (Ruff's own), `PT` (pytest style) and `D100`, `D101`, `D103`, `D104` (docstrings required on modules, public classes, public functions and packages). The per-file ignore turns off docstring rules and one pytest rule for tests, with the reason in the comment.
+
+```toml
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+# Test functions are named for the behavior they check; annotating every one adds noise, not safety.
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+```
+
+mypy's settings: Python 3.12, `strict = true` (full annotations and no implicit `Any`), the folders `src` and `tests`, and the Pydantic plugin. The override relaxes the annotation requirement for tests, with the reason in the comment.
+
+```toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+# Starlette 1.x announces that its TestClient will move off httpx; the tests only use the client, not the transport.
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated"]
+markers = [
+    "integration: needs PostgreSQL from docker-compose.yml (make up)",
+    "e2e: runs the lesson's scenario through the command-line program and a real server against PostgreSQL (make up)",
+]
+```
+
+pytest's settings: where the tests are, always-on options (`-ra` prints a summary of non-passing tests, `--strict-markers` makes unknown markers an error), a filter for a known harmless warning, and the two registered markers `integration` and `e2e`.
+
+```toml
+[tool.coverage.run]
+source = ["payments_reconciliation"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+```
+
+coverage.py's settings: measure only `payments_reconciliation`, count branches (`branch = true`), show missing line numbers and do not hide fully covered files in the report.
+
+```toml
+[tool.importlinter]
+root_package = "payments_reconciliation"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: interfaces -> infrastructure -> application -> domain, never upward"
+type = "layers"
+layers = [
+    "payments_reconciliation.interfaces",
+    "payments_reconciliation.infrastructure",
+    "payments_reconciliation.application",
+    "payments_reconciliation.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domain and application know nothing about PostgreSQL, HTTP or the web framework"
+type = "forbidden"
+source_modules = ["payments_reconciliation.domain", "payments_reconciliation.application"]
+forbidden_modules = ["psycopg", "psycopg_pool", "fastapi", "starlette", "uvicorn", "httpx", "pydantic"]
+```
+
+import-linter's settings. `root_package` is the package to analyze and `include_external_packages = true` also tracks third-party imports. The first contract (`type = "layers"`) lists the layers from top to bottom and forbids an import that points upward. The second (`type = "forbidden"`) says the domain and application packages may import none of `psycopg`, `psycopg_pool`, `fastapi`, `starlette`, `uvicorn`, `httpx` or `pydantic`, not even indirectly.
+
+<!-- /listing:pyproject.toml -->
+
 ## Try it yourself
 
 1. Parse the file with Python's own TOML reader and print the project name:

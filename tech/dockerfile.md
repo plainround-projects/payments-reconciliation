@@ -91,6 +91,65 @@ CMD ["payments-reconciliation-serve"]
 - `HEALTHCHECK`: every 15 seconds run `payments-reconciliation-health` (a program installed from `pyproject.toml`; it calls `/health`); fail it if it takes more than 6 seconds; mark the container `unhealthy` after 3 failures in a row.
 - `CMD`: the default command, `payments-reconciliation-serve`. The square-bracket form is the **exec form**: Docker runs the program directly, not through a shell, so it is process 1 and receives `SIGTERM` itself, which is what lets the server shut down gracefully.
 
+<!-- listing:Dockerfile -->
+### `Dockerfile` (29 lines)
+
+```dockerfile
+# The HTTP API as an image (mount the provider's settlement files at /data/settlement): non-root user, hash-pinned dependencies, the health endpoint as its check.
+#   docker build -t payments-reconciliation:dev .
+#   docker compose --profile app up --build        (PostgreSQL and the API together)
+FROM python:3.12.8-slim-bookworm@sha256:2199a62885a12290dc9c5be3ca0681d367576ab7bf037da120e564723292a2f0
+```
+
+The first comment line says the image runs the HTTP API and that the provider's settlement files are meant to be mounted at `/data/settlement` (a volume), with a non-root user, hash-pinned dependencies and the health endpoint as its check; the other comment lines show how to build and run it. `FROM python:3.12.8-slim-bookworm@sha256:...` picks the starting image: official Python 3.12.8 on Debian 12 in its slim variant, pinned by its content digest so the bytes cannot change.
+
+```dockerfile
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    API_HOST=0.0.0.0 \
+    API_PORT=8462 \
+    SETTLEMENT_DIR=/data/settlement
+```
+
+`ENV` sets environment variables for the build and for the running container (`\` continues the line). `PYTHONDONTWRITEBYTECODE=1` stops Python writing `.pyc` files; `PYTHONUNBUFFERED=1` sends output at once so logs appear immediately; `PIP_NO_CACHE_DIR=1` keeps pip's download cache out of the image; `PIP_DISABLE_PIP_VERSION_CHECK=1` stops pip checking for its own update; `API_HOST=0.0.0.0` makes the API listen on all interfaces (inside a container `127.0.0.1` would be unreachable from outside); `API_PORT=8462` is the port; `SETTLEMENT_DIR=/data/settlement` tells the program where to find the provider's files.
+
+```dockerfile
+WORKDIR /app
+COPY requirements.lock ./
+RUN pip install --require-hashes -r requirements.lock
+```
+
+`WORKDIR /app` creates and enters the folder `/app` for the following instructions. `COPY requirements.lock ./` copies the lock from the build folder into it. `RUN pip install --require-hashes -r requirements.lock` installs exactly the locked runtime packages. This comes **before** the source is copied so Docker can reuse this slow layer when only code changes.
+
+```dockerfile
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN pip install --no-deps .
+```
+
+Now the project: `pyproject.toml` and `README.md` (which the package metadata refers to) and the `src` folder are copied, and `RUN pip install --no-deps .` installs this package and its commands without resolving anything.
+
+```dockerfile
+RUN useradd --system --uid 10001 --no-create-home app \
+    && mkdir -p /data/settlement && chown app /data/settlement
+USER app
+VOLUME /data/settlement
+```
+
+`useradd --system --uid 10001 --no-create-home app` creates an unprivileged system user with a fixed number and no home folder. `&& mkdir -p /data/settlement && chown app /data/settlement` (the `&&` runs the next command only if the previous one succeeded) creates the settlement folder and gives it to that user, so the program can read it (and write the files of a simulated day). `USER app` makes everything after, including the running service, use that user. `VOLUME /data/settlement` declares the folder as a mount point: a place where Docker expects storage from outside to be attached.
+
+```dockerfile
+EXPOSE 8462
+HEALTHCHECK --interval=15s --timeout=6s --retries=3 CMD ["payments-reconciliation-health"]
+CMD ["payments-reconciliation-serve"]
+```
+
+`EXPOSE` documents the port (it does not publish it). `HEALTHCHECK --interval=15s --timeout=6s --retries=3 CMD ["payments-reconciliation-health"]` makes Docker run the health command every 15 seconds, give it 6 seconds, and mark the container unhealthy after 3 failures in a row. `CMD ["payments-reconciliation-serve"]` is the command the container runs; the square-bracket form runs the program directly (not through a shell), so it is process 1 and receives `SIGTERM` itself.
+
+<!-- /listing:Dockerfile -->
+
 ## Try it yourself
 
 1. Build it (needs Docker and network, can take minutes):

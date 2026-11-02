@@ -93,6 +93,77 @@ api:
 - The `environment` list passes the settings the Python program reads (see `environment-variables-and-dotenv.md`), including `SETTLEMENT_DIR`, the folder inside the container where it looks for the provider's files.
 - `volumes: - ./var/settlement:/data/settlement:ro` is a **bind mount**: the host folder `var/settlement` (where `make run` and the simulator write the CSV files) appears inside the container at `/data/settlement`. `:ro` makes it read-only for the container, which only needs to read the provider's files. Like the Dockerfile's `VOLUME`, it keeps the daily files outside the image.
 
+<!-- listing:docker-compose.yml -->
+### `docker-compose.yml` (42 lines)
+
+```yaml
+# PostgreSQL 18 for local use only; the API can run as a container too (profile "app").
+name: payments-reconciliation
+
+services:
+```
+
+The comment says this is PostgreSQL 18 for local use, with the API as an optional container under the profile `app`. `name: payments-reconciliation` fixes the Compose project name, which prefixes container, network and volume names. `services:` is the map of containers.
+
+```yaml
+  postgres:
+    image: postgres:18
+    # A disposable local database: durability is switched off so the tests and demos do not depend on disk speed, and a
+    # crash recovers instantly. Never use these settings for data you want to keep.
+    command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
+    ports:
+      - "${POSTGRES_PORT:-54612}:5432"
+```
+
+The database service: `image: postgres:18` is used as published. The comment above `command` explains the three server flags `fsync=off`, `synchronous_commit=off` and `full_page_writes=off`: they trade crash-safety for speed, acceptable only for a disposable database. `ports: - "${POSTGRES_PORT:-54612}:5432"` publishes the container's port 5432 on the computer's port 54612 (the text `${NAME:-default}` means "the variable NAME, or default if unset").
+
+```yaml
+    environment:
+      # Credentials come from .env (make up copies .env.example the first time); none is written here.
+      POSTGRES_USER: ${POSTGRES_USER:-reconciliation}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env first}
+      POSTGRES_DB: ${POSTGRES_DB:-reconciliation}
+```
+
+`environment` gives the image its first-start settings: `POSTGRES_USER` and `POSTGRES_DB` (default `reconciliation`) and `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env first}`: the `:?message` form makes Compose stop with that message if the variable is unset, so no password is written in the file.
+
+```yaml
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 30
+```
+
+The health check: `test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]` runs `pg_isready` through a shell inside the container (`$$` stops Compose from filling the variables itself; `-h 127.0.0.1` forces a network check, because during first start the image runs a temporary server that listens only on a local socket). It runs every 5 seconds, may take 20, and after 30 failures the service is unhealthy; `up --wait` waits for healthy. The longer limits leave room for a busy machine.
+
+```yaml
+  api:
+    profiles: ["app"]
+    build: .
+    image: payments-reconciliation:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8462}:8462"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-reconciliation}
+      POSTGRES_USER: ${POSTGRES_USER:-reconciliation}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env first}
+      API_HOST: 0.0.0.0
+      API_PORT: "8462"
+      SETTLEMENT_DIR: /data/settlement
+    volumes:
+      - ./var/settlement:/data/settlement:ro
+```
+
+The optional API service. `profiles: ["app"]` means it starts only with `--profile app`. `build: .` builds the image from the `Dockerfile` here and `image:` names it. `depends_on: postgres: condition: service_healthy` starts the API only after the database is healthy. `ports` publishes 8462. `environment` passes the settings the program reads; `POSTGRES_HOST: postgres` uses the service name as the host, which Compose's private network resolves to the database container, and the container-side port is 5432. `SETTLEMENT_DIR: /data/settlement` is where the program looks for the provider's files, and `volumes: - ./var/settlement:/data/settlement:ro` mounts the host folder `var/settlement` there; `:ro` means read-only for the container.
+
+<!-- /listing:docker-compose.yml -->
+
 ## Try it yourself
 
 1. Validate and print the final file with variables filled in:
