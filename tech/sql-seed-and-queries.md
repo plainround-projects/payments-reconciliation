@@ -84,7 +84,7 @@ INSERT INTO journal_entries (id, payment_id, operation, reference, leg, created_
     ('cccccccc-0000-4000-8000-000000000018', 'bbbbbbbb-0000-4000-8000-000000000006', 'CAPTURE', 'capture', 'CAPTURE_FEE', '2026-10-19T15:00:00Z');
 ```
 
-Eighteen entries, three for each payment (every payment's capture has the three legs `CAPTURE_GROSS`, `CAPTURE_NET` and `CAPTURE_FEE`). Each row gives the entry id (`cccccccc-0000-4000-8000-0000000000NN`, numbered 01 to 18), the payment it belongs to, the operation `CAPTURE`, the reference `capture`, the leg, and the capture time of its payment. Entries 1 to 3 belong to payment 1, 4 to 6 to payment 2, and so on.
+Eighteen entries, three for each payment (every payment's capture has the three legs `CAPTURE_GROSS`, `CAPTURE_NET` and `CAPTURE_FEE`). Each row gives the entry id (`cccccccc-0000-4000-8000-0000000000NN`, numbered 01 to 18), the payment it belongs to, the operation `CAPTURE`, the reference `capture`, the leg, and the capture time of its payment. Entries 1 to 3 belong to payment 1, 4 to 6 to payment 2, 7 to 9 to payment 3, 10 to 12 to payment 4, 13 to 15 to payment 5 and 16 to 18 to payment 6.
 
 ```sql
 INSERT INTO postings (entry_id, payment_id, account, amount_minor, currency, created_at) VALUES

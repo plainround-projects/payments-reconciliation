@@ -16,7 +16,7 @@ TOML (Tom's Obvious, Minimal Language) is a plain-text **configuration file form
 
 ## How it works underneath
 
-A program opens the file, parses the text into nested dictionaries and lists, and reads what it needs. Tools look for their own table: Ruff reads `[tool.ruff]`, mypy `[tool.mypy]`, and so on. Packaging tools read `[build-system]` and `[project]`.
+A program opens the file, parses the text into nested dictionaries and lists, and reads what it needs. Tools look for their own table: Ruff reads `[tool.ruff]`, mypy `[tool.mypy]`; each tool reads its own table. Packaging tools read `[build-system]` and `[project]`.
 
 ## Walkthrough of this repository's use
 

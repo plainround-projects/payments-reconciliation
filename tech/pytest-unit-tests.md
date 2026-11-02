@@ -236,7 +236,7 @@ class SequentialIds:
         return UUID(f"00000000-0000-4000-8000-{self._counter:012d}")
 ```
 
-`SequentialIds` implements `IdSource` with predictable ids: a counter increases on each call and the UUID is built from it with `f"...{self._counter:012d}"` (`:012d` pads the number with zeros to 12 digits), giving `00000000-0000-4000-8000-000000000001`, then `...0002` and so on.
+`SequentialIds` implements `IdSource` with predictable ids: a counter increases on each call and the UUID is built from it with `f"...{self._counter:012d}"` (`:012d` pads the number with zeros to 12 digits), giving `00000000-0000-4000-8000-000000000001`, then `...0002`, then `...0003`, one more each time.
 
 ```python
 class LedgerIntegrityError(Exception):

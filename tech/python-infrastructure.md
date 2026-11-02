@@ -510,7 +510,7 @@ Keeps the fee policy, a re-entrant lock, the id prefix and two counters (capture
             self._sequence = 0
 ```
 
-Begins a new run of transaction ids: `<prefix>0001`, `<prefix>0002`, and so on, so each simulated day can have its own recognizable ids.
+Begins a new run of transaction ids: `<prefix>0001`, then `<prefix>0002`, one more each time, so each simulated day can have its own recognizable ids.
 
 ```python
     def capture(self, *, idempotency_key: str, amount: Money, occurred_at: datetime) -> CaptureResult:
