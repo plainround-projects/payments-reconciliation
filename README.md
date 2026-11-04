@@ -10,6 +10,24 @@ A daily reconciliation job for a small payments service: it compares the ledger 
 | **Architecture** | [ARCHITECTURE.md](ARCHITECTURE.md), decisions: [docs/adr](docs/adr) |
 | **Technology notes** | [tech/](tech/README.md): one beginner note per technology used here |
 
+## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
+  <img alt="The Matching job joins the Settlement report and Your ledger on the provider's transaction id and classifies each difference. Timing and fees are cleared by rules, Real breaks are fixed from the report, both writing balanced entries to the ledger, and what needs a person goes to the Worklist and the Daily report." src="docs/diagrams/architecture.svg">
+</picture>
+
+Every difference is classified by cause first, then either cleared by a rule, fixed from the report and never from the provider, or left on the worklist for a person.
+
+## How one run flows
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/flow-dark.svg">
+  <img alt="make run reconciles a clean day, then a planted day with six breaks, resolves it twice to show nothing changes, prints a daily report that balances with 4.99 open, and reconciles the next day." src="docs/diagrams/flow.svg">
+</picture>
+
+The amber rows are the six breaks; the green box is the carried timing break clearing itself on the next day, leaving only the amount mismatch on the worklist.
+
 ## Prerequisites
 
 | Tool | Version | Used for |

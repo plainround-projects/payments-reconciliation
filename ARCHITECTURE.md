@@ -23,6 +23,8 @@ This fits because the job has two inputs it does not control (a file and a datab
 
 ## Data flow
 
+Drawn versions of this figure and of the walk-through: [the architecture](docs/diagrams/architecture.svg) and [one run](docs/diagrams/flow.svg).
+
 ```mermaid
 flowchart LR
     subgraph mine["Your books"]
