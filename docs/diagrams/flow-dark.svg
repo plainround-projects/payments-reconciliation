@@ -75,7 +75,7 @@ text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',mo
 <rect class="svc" x="1025" y="128" width="110" height="48" rx="10"/>
 <text class="lane" x="1080" y="148" text-anchor="middle">Daily</text>
 <text class="lane" x="1080" y="168" text-anchor="middle">report</text>
-<path class="hair" d="M460 176V368M610 176V304M760 176V688M910 176V688M1080 176V432"/>
+<path class="hair" d="M460 176V368M610 176V304M760 176V688M910 176V688M1080 176V624"/>
 <path class="hair" d="M66 216V664"/>
 <circle class="dot" cx="66" cy="216" r="15"/>
 <text class="num" x="66" y="221" text-anchor="middle">1</text>
